@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buy or Wait — Budget Analyzer</title>
+<style>
+  :root {
+    --grid-line: #d4d4d4;
+    --header-bg: #f3f3f3;
+    --header-bg-2: #e8eef7;
+    --col-header-bg: #eef1f4;
+    --cell-bg: #ffffff;
+    --cell-alt-bg: #fafbfc;
+    --text: #1a1a1a;
+    --text-dim: #5f6368;
+    --accent: #1e6e42;
+    --accent-bg: #e6f4ea;
+    --warn: #b06a00;
+    --warn-bg: #fff4e0;
+    --stop: #a12b2b;
+    --stop-bg: #fbe7e7;
+    --formula-bar-bg: #ffffff;
+    --ribbon-bg: #217346;
+    --ribbon-bg-2: #1c5f3a;
+    --shadow: rgba(0,0,0,0.08);
+    --page-bg: #ecedf0;
+    --input-border: #b8c2cc;
+    --focus-ring: #1e6e42;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    min-height: 100vh;
+    padding: 24px 12px 48px;
+  }
+
+  .workbook {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--cell-bg);
+    border: 1px solid var(--grid-line);
+    box-shadow: 0 6px 24px var(--shadow);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .ribbon {
+    background: linear-gradient(180deg, var(--ribbon-bg), var(--ribbon-bg-2));
+    color: #fff;
+    padding: 14px 16px;
+  }
+  .ribbon-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .formula-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--formula-bar-bg);
+    border-bottom: 1px solid var(--grid-line);
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .name-box {
+    border: 1px solid var(--input-border);
+    border-radius: 2px;
+    padding: 2px 8px;
+    min-width: 46px;
+    text-align: center;
+    background: var(--cell-bg);
+    color: var(--text);
+    font-size: 12px;
+  }
+  .fx { font-style: italic; font-family: Georgia, serif; color: var(--text-dim); }
+  .formula-content {
+    flex: 1;
+    padding: 2px 6px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sheet {
+    display: grid;
+    grid-template-columns: 34px 1fr 1fr;
+    border-bottom: 8px solid var(--header-bg);
+  }
+  .col-header {
+    background: var(--col-header-bg);
+    color: var(--text-dim);
+    text-align: center;
+    font-size: 12px;
+    padding: 4px 0;
+    border: 1px solid var(--grid-line);
+    border-top: none;
+    border-left: none;
+  }
+  .row-num {
+    background: var(--col-header-bg);
+    color: var(--text-dim);
+    text-align: center;
+    font-size: 12px;
+    padding: 8px 0;
+    border: 1px solid var(--grid-line);
+    border-top: none;
+    border-left: none;
+  }
+  .cell {
+    border: 1px solid var(--grid-line);
+    border-top: none;
+    border-left: none;
+    padding: 6px 10px;
+    font-size: 13.5px;
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+  }
+  .cell.label { background: var(--cell-alt-bg); font-weight: 600; color: var(--text); }
+  .cell.input-cell { padding: 3px 6px; }
+  .cell.input-cell input {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--text);
+    padding: 6px 6px;
+    border-radius: 2px;
+    text-align: right;
+  }
+  .cell.input-cell input:focus {
+    outline: none;
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
+    background: var(--cell-bg);
+  }
+  .cell.input-cell input::placeholder { color: var(--text-dim); opacity: 0.6; }
+
+  .decision-row .cell.label { background: var(--header-bg-2); }
+  .decision-cell {
+    grid-column: 2 / span 2;
+    font-weight: 700;
+    font-size: 16px;
+    justify-content: flex-start;
+  }
+  .decision-cell.status-buy { background: var(--accent-bg); color: var(--accent); }
+  .decision-cell.status-wait { background: var(--warn-bg); color: var(--warn); }
+  .decision-cell.status-skip { background: var(--stop-bg); color: var(--stop); }
+  .decision-sub {
+    font-weight: 400;
+    font-size: 12.5px;
+    display: block;
+    margin-top: 3px;
+    opacity: 0.85;
+  }
+
+  .sheet-divider {
+    padding: 14px 16px 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--grid-line);
+  }
+
+  .breakdown { display: grid; grid-template-columns: 34px 2fr 1fr; }
+  .breakdown .cell.num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+  .breakdown .cell.total-row { font-weight: 700; border-top: 2px solid var(--text-dim); }
+  .breakdown .cell.deduction { color: var(--stop); }
+  .breakdown .cell.addition { color: var(--accent); }
+
+  .footnote {
+    padding: 14px 18px 20px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 480px) {
+    .sheet, .breakdown { grid-template-columns: 22px 1fr 1fr; }
+    .cell { font-size: 12.5px; padding: 6px 6px; }
+    .decision-cell { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="workbook">
+  <div class="ribbon">
+    <div class="ribbon-title">Buy or Wait</div>
+  </div>
+
+  <div class="formula-bar">
+    <div class="name-box" id="nameBox">B5</div>
+    <div class="fx">fx</div>
+    <div class="formula-content" id="formulaContent">=IF(Price&lt;=Surplus, "Buy now", IF(Days&lt;=90, "Wait "&amp;Days&amp;" days", "Skip"))</div>
+  </div>
+
+  <div class="sheet">
+    <div class="col-header"></div>
+    <div class="col-header">A</div>
+    <div class="col-header">B</div>
+
+    <div class="row-num">1</div>
+    <div class="cell label">Monthly income</div>
+    <div class="cell input-cell">
+      <input type="number" id="income" inputmode="decimal" placeholder="$0.00" min="0" step="0.01" onfocus="setActive('B1','=Monthly take-home pay')">
+    </div>
+
+    <div class="row-num">2</div>
+    <div class="cell label">Recurring bills</div>
+    <div class="cell input-cell">
+      <input type="number" id="bills" inputmode="decimal" placeholder="$0.00" min="0" step="0.01" onfocus="setActive('B2','=Rent, subscriptions, loan payments, etc.')">
+    </div>
+
+    <div class="row-num">3</div>
+    <div class="cell label">Monthly savings goal</div>
+    <div class="cell input-cell">
+      <input type="number" id="savings" inputmode="decimal" placeholder="$0.00" min="0" step="0.01" onfocus="setActive('B3','=Amount you want set aside before spending')">
+    </div>
+
+    <div class="row-num">4</div>
+    <div class="cell label">Purchase price</div>
+    <div class="cell input-cell">
+      <input type="number" id="price" inputmode="decimal" placeholder="$0.00" min="0" step="0.01" onfocus="setActive('B4','=Cost of the item you want to buy')" oninput="calculate()">
+    </div>
+
+    <div class="row-num">5</div>
+    <div class="cell label">Decision</div>
+    <div class="cell decision-cell" id="decisionCell">
+      Enter your numbers above
+      <span class="decision-sub" id="decisionSub">Fill in every field to see a recommendation.</span>
+    </div>
+  </div>
+
+  <div class="sheet-divider">Where the money goes — monthly breakdown</div>
+
+  <div class="breakdown" id="breakdownTable">
+    <div class="col-header"></div>
+    <div class="col-header">A</div>
+    <div class="col-header">B</div>
+
+    <div class="row-num">6</div>
+    <div class="cell label">Monthly income</div>
+    <div class="cell num" id="bd-income">$0.00</div>
+
+    <div class="row-num">7</div>
+    <div class="cell label deduction">− Recurring bills</div>
+    <div class="cell num deduction" id="bd-bills">−$0.00</div>
+
+    <div class="row-num">8</div>
+    <div class="cell label deduction">− Savings goal</div>
+    <div class="cell num deduction" id="bd-savings">−$0.00</div>
+
+    <div class="row-num">9</div>
+    <div class="cell label total-row">= Monthly surplus</div>
+    <div class="cell num total-row" id="bd-surplus">$0.00</div>
+
+    <div class="row-num">10</div>
+    <div class="cell label">Surplus per day</div>
+    <div class="cell num" id="bd-daily">$0.00</div>
+
+    <div class="row-num">11</div>
+    <div class="cell label">Purchase price</div>
+    <div class="cell num" id="bd-price">$0.00</div>
+
+    <div class="row-num">12</div>
+    <div class="cell label deduction">Amount deducted from savings if bought today</div>
+    <div class="cell num deduction" id="bd-deducted">$0.00</div>
+
+    <div class="row-num">13</div>
+    <div class="cell label total-row">Days needed to save up</div>
+    <div class="cell num total-row" id="bd-days">—</div>
+  </div>
+
+  <div class="footnote">
+    "Buy now" means this month's surplus already covers the price without dipping under your savings goal.
+    "Wait N days" estimates how long it takes your daily surplus to cover the price.
+    "Skip" appears when there's no monthly surplus, or saving up would take more than 90 days.
+  </div>
+</div>
+
+<script>
+function setActive(cell, formula) {
+  document.getElementById('nameBox').textContent = cell;
+  document.getElementById('formulaContent').textContent = formula;
+}
+
+function fmt(n) {
+  const sign = n < 0 ? '−' : '';
+  return sign + '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function calculate() {
+  const income = parseFloat(document.getElementById('income').value) || 0;
+  const bills = parseFloat(document.getElementById('bills').value) || 0;
+  const savings = parseFloat(document.getElementById('savings').value) || 0;
+  const priceRaw = document.getElementById('price').value;
+  const price = parseFloat(priceRaw) || 0;
+
+  const surplus = income - bills - savings;
+  const dailySurplus = surplus / 30;
+
+  document.getElementById('bd-income').textContent = fmt(income);
+  document.getElementById('bd-bills').textContent = '−' + fmt(bills).replace('−','');
+  document.getElementById('bd-savings').textContent = '−' + fmt(savings).replace('−','');
+  document.getElementById('bd-surplus').textContent = fmt(surplus);
+  document.getElementById('bd-daily').textContent = fmt(dailySurplus);
+  document.getElementById('bd-price').textContent = fmt(price);
+
+  const decisionCell = document.getElementById('decisionCell');
+  const bdDeducted = document.getElementById('bd-deducted');
+  const bdDays = document.getElementById('bd-days');
+
+  if (!priceRaw || price <= 0) {
+    decisionCell.className = 'cell decision-cell';
+    decisionCell.innerHTML = 'Enter your numbers above <span class="decision-sub" id="decisionSub">Fill in every field to see a recommendation.</span>';
+    bdDeducted.textContent = '$0.00';
+    bdDays.textContent = '—';
+    return;
+  }
+
+  if (surplus <= 0) {
+    decisionCell.className = 'cell decision-cell status-skip';
+    decisionCell.innerHTML = 'Skip <span class="decision-sub">Bills and your savings goal already use up all your income — there\'s nothing left for this purchase.</span>';
+    bdDeducted.textContent = fmt(0);
+    bdDays.textContent = 'N/A';
+    return;
+  }
+
+  if (price <= surplus) {
+    decisionCell.className = 'cell decision-cell status-buy';
+    decisionCell.innerHTML = 'Buy now <span class="decision-sub">This month\'s surplus covers it — your bills and savings goal stay on track.</span>';
+    bdDeducted.textContent = fmt(price);
+    bdDays.textContent = '0 (affordable today)';
+    return;
+  }
+
+  const daysNeeded = Math.ceil(price / dailySurplus);
+
+  if (daysNeeded > 90) {
+    decisionCell.className = 'cell decision-cell status-skip';
+    decisionCell.innerHTML = 'Skip <span class="decision-sub">At your current surplus it would take ' + daysNeeded.toLocaleString() + ' days (over 3 months) to save up — probably not worth waiting for.</span>';
+    bdDeducted.textContent = fmt(price);
+    bdDays.textContent = daysNeeded.toLocaleString() + ' days';
+    return;
+  }
+
+  decisionCell.className = 'cell decision-cell status-wait';
+  decisionCell.innerHTML = 'Wait ' + daysNeeded + ' day' + (daysNeeded === 1 ? '' : 's') + ' <span class="decision-sub">Keep bills and savings on track, and you\'ll have enough surplus saved up by then.</span>';
+  bdDeducted.textContent = fmt(price);
+  bdDays.textContent = daysNeeded + ' day' + (daysNeeded === 1 ? '' : 's');
+}
+
+['income','bills','savings','price'].forEach(id => {
+  document.getElementById(id).addEventListener('input', calculate);
+});
+calculate();
+</script>
+
+</body>
+</html>
